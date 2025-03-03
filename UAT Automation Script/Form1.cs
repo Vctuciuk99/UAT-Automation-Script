@@ -102,6 +102,7 @@ namespace UAT_Automation_Script
 
                         int rowCount = uatWorkSheet.Dimension.Rows;
                         int endpointColumn = 1;
+                        int expectedResultSheet = 6;
                         int signatureColumnIndex = 8;
                         int actualResponseColumnIndex = 9;
                         int remarksColumnIndex = 12;
@@ -112,8 +113,8 @@ namespace UAT_Automation_Script
                             string clientActualSignature = uatWorkSheet.Cells[row, signatureColumnIndex].Text.Trim();
                             string clientActualResponse = uatWorkSheet.Cells[row, actualResponseColumnIndex].Text.Trim();
                             string endpoint = uatWorkSheet.Cells[row, endpointColumn].Text.Trim();
+                            string expectedResult = uatWorkSheet.Cells[row, expectedResultSheet].Text.Trim();
 
-                           
                             // Check if the whole row is empty
                             bool isRowEmpty = true;
                             for (int col = 1; col <= uatWorkSheet.Dimension.Columns; col++)
@@ -126,27 +127,40 @@ namespace UAT_Automation_Script
                             }
                             if (isRowEmpty) continue;
 
-
                             // para ma gaya format ng json logs
-                            string singleLineJson = clientActualResponse
+                            string formatActualResponse = clientActualResponse
                                 .Replace("\n", "")
                                 .Replace("\r", "")
                                 .Replace("  ", "")  
                                 .Trim();
 
-                            singleLineJson = Regex.Replace(singleLineJson, @"\s*:\s*", ":"); 
-                            singleLineJson = Regex.Replace(singleLineJson, @"\s*,\s*", ",");  
-                            string finalFormattedResponse = singleLineJson.Replace("\"", "\\\"");
+                            formatActualResponse = Regex.Replace(formatActualResponse, @"\s*:\s*", ":");
+                            formatActualResponse = Regex.Replace(formatActualResponse, @"\s*,\s*", ",");  
+                            string finalFormattedResponse = formatActualResponse.Replace("\"", "\\\"");
 
-                            // Pang debug lang
+                            
+                            //Console.WriteLine(expectedResult);
+                            var expectedCodeRemarks = JsonConvert.DeserializeObject<dynamic>(expectedResult);
+                            var actualCodeRemarks = JsonConvert.DeserializeObject<dynamic>(clientActualResponse);
+
+                            string expectedresponseCode = "200";
+                            string expectedRemarks = expectedCodeRemarks.remarks;
+                            string actualresponseCode = actualCodeRemarks.responseCode;
+                            string actualRemarks = actualCodeRemarks.remarks;
+
+                            Console.WriteLine($"Expected Response Code: \"{expectedresponseCode}\"");
+                            Console.WriteLine($"Expected Remarks: \"{expectedRemarks}\"");
+                            Console.WriteLine($"Actual Response Code: \"{actualresponseCode}\"");
+                            Console.WriteLine($"ActualRemarks: \"{actualRemarks}\"");
+
                             Console.WriteLine($"Curent Sheet: \"{uatWorkSheet.Name}\"");
                             Console.WriteLine($"Current Endpoint: \"{endpoint}\"");
                             Console.WriteLine($"Column: \"{signatureColumnIndex}\" Row: \"{row}\"");
                             Console.WriteLine($"Excel Signature: \"{clientActualSignature}\"");
                             Console.WriteLine($"Excel Actual Response: \"{finalFormattedResponse}\"");
-                            
 
-                            // If both Signature and Actual Response are empty, mark as SKIPPED
+
+                            //STEP 1: Check of scenario is skipped
                             if (string.IsNullOrEmpty(clientActualSignature) && string.IsNullOrEmpty(clientActualResponse))
                             {
                                 uatWorkSheet.Cells[row, remarksColumnIndex].Value = "SKIPPED";
@@ -154,11 +168,23 @@ namespace UAT_Automation_Script
                                 continue;
                             }
 
-                            //Console.WriteLine(jsonFileLog);
+                            //STEP 2: check if expected api response code == actual api response code
+                            if (expectedresponseCode == actualresponseCode && expectedRemarks == actualRemarks)
+                            {
+                                Console.WriteLine("STEP 2 PASSED!!!");
+                                continue;
+                            }
+                            else
+                            {
+                                uatWorkSheet.Cells[row, remarksColumnIndex].Value = "FAILED";
+                                uatWorkSheet.Cells[row, commentColumnIndex].Value = "Expected response code and remarks did not meet";
+                                break;
+                            }
 
                             JArray jsonObjects = JArray.Parse(jsonFileLog);
                             bool matchFound = false;
 
+                            //Step 3: check if existing on logs
                             foreach (JObject jsonObject in jsonObjects)
                             {
                                 string jsonLog = jsonObject.ToString();
@@ -177,12 +203,6 @@ namespace UAT_Automation_Script
                                     uatWorkSheet.Cells[row, commentColumnIndex].Value = "Scenario is verified, log date entry was: " + formattedDateEntry;
                                     break;
 
-                                    // if endpoint 
-                                    //else ung code mismo
-                                }
-                                else
-                                {
-                                    // if endpoint
                                 }
                                 
                             }
