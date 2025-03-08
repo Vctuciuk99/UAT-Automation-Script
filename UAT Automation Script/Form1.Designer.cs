@@ -33,7 +33,7 @@
             txt_jsonfilePath = new TextBox();
             label3 = new Label();
             verify_file_btn = new Button();
-            txt_excelFilePath = new TextBox();
+            txt_excelfilePath = new TextBox();
             browse_excel_fiel_btn = new Button();
             browse_json_file_btn = new Button();
             excel_errorMsgLabel = new Label();
@@ -43,6 +43,7 @@
             lbl_filePath = new Label();
             apiDropdown = new ComboBox();
             label4 = new Label();
+            failedScenariosListBox = new ListBox();
             SuspendLayout();
             // 
             // label1
@@ -97,15 +98,15 @@
             verify_file_btn.UseVisualStyleBackColor = true;
             verify_file_btn.Click += verify_file_btn_Click;
             // 
-            // txt_excelFilePath
+            // txt_excelfilePath
             // 
-            txt_excelFilePath.BackColor = SystemColors.ControlLightLight;
-            txt_excelFilePath.Font = new Font("Segoe UI", 12F);
-            txt_excelFilePath.Location = new Point(182, 146);
-            txt_excelFilePath.Name = "txt_excelFilePath";
-            txt_excelFilePath.ReadOnly = true;
-            txt_excelFilePath.Size = new Size(594, 34);
-            txt_excelFilePath.TabIndex = 11;
+            txt_excelfilePath.BackColor = SystemColors.ControlLightLight;
+            txt_excelfilePath.Font = new Font("Segoe UI", 12F);
+            txt_excelfilePath.Location = new Point(182, 146);
+            txt_excelfilePath.Name = "txt_excelfilePath";
+            txt_excelfilePath.ReadOnly = true;
+            txt_excelfilePath.Size = new Size(594, 34);
+            txt_excelfilePath.TabIndex = 11;
             // 
             // browse_excel_fiel_btn
             // 
@@ -192,11 +193,22 @@
             label4.TabIndex = 20;
             label4.Text = "API";
             // 
+            // failedScenariosListBox
+            // 
+            failedScenariosListBox.Font = new Font("Segoe UI", 12F, FontStyle.Regular, GraphicsUnit.Point, 0);
+            failedScenariosListBox.FormattingEnabled = true;
+            failedScenariosListBox.ItemHeight = 28;
+            failedScenariosListBox.Location = new Point(12, 443);
+            failedScenariosListBox.Name = "failedScenariosListBox";
+            failedScenariosListBox.Size = new Size(853, 340);
+            failedScenariosListBox.TabIndex = 21;
+            // 
             // Form1
             // 
             AutoScaleDimensions = new SizeF(8F, 20F);
             AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(877, 501);
+            ClientSize = new Size(877, 821);
+            Controls.Add(failedScenariosListBox);
             Controls.Add(label4);
             Controls.Add(apiDropdown);
             Controls.Add(lbl_filePath);
@@ -206,7 +218,7 @@
             Controls.Add(excel_errorMsgLabel);
             Controls.Add(browse_json_file_btn);
             Controls.Add(browse_excel_fiel_btn);
-            Controls.Add(txt_excelFilePath);
+            Controls.Add(txt_excelfilePath);
             Controls.Add(verify_file_btn);
             Controls.Add(label3);
             Controls.Add(txt_jsonfilePath);
@@ -226,7 +238,7 @@
         private TextBox txt_jsonfilePath;
         private Label label3;
         private Button verify_file_btn;
-        private TextBox txt_excelFilePath;
+        private TextBox txt_excelfilePath;
         private Button browse_excel_fiel_btn;
         private Button browse_json_file_btn;
         private Label excel_errorMsgLabel;
@@ -236,5 +248,6 @@
         private Label lbl_filePath;
         private ComboBox apiDropdown;
         private Label label4;
+        private ListBox failedScenariosListBox;
     }
 }

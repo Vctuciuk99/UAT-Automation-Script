@@ -33,7 +33,7 @@ namespace UAT_Automation_Script
                 if (openFileDialog.ShowDialog() == DialogResult.OK)
                 {
                     excelFilePath = openFileDialog.FileName;
-                    txt_excelFilePath.Text = excelFilePath;
+                    txt_excelfilePath.Text = excelFilePath;
                 }
             }
         }
@@ -74,7 +74,7 @@ namespace UAT_Automation_Script
             verify_file_btn.Enabled = true;
             jsonFilePath = null;
             excelFilePath = null;
-            txt_excelFilePath.Text = "";
+            txt_excelfilePath.Text = "";
             txt_jsonfilePath.Text = "";
 
 
@@ -82,10 +82,13 @@ namespace UAT_Automation_Script
 
         private bool verifyUatScript(string excelFile, string jsonFile)
         {
+
             try
             {
                 ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
                 FileInfo excelFileInfo = new FileInfo(excelFile);
+
+                List<string> failedScenarios = new List<string>(); // Store failed scenarios
 
                 using (ExcelPackage package = new ExcelPackage(excelFileInfo))
                 {
@@ -110,110 +113,168 @@ namespace UAT_Automation_Script
 
                         for (int row = 2; row <= rowCount; row++)
                         {
-                            string clientActualSignature = uatWorkSheet.Cells[row, signatureColumnIndex].Text.Trim();
-                            string clientActualResponse = uatWorkSheet.Cells[row, actualResponseColumnIndex].Text.Trim();
-                            string endpoint = uatWorkSheet.Cells[row, endpointColumn].Text.Trim();
-                            string expectedResult = uatWorkSheet.Cells[row, expectedResultSheet].Text.Trim();
-
-                            // Check if the whole row is empty
-                            bool isRowEmpty = true;
-                            for (int col = 1; col <= uatWorkSheet.Dimension.Columns; col++)
+                            try
                             {
-                                if (!string.IsNullOrWhiteSpace(uatWorkSheet.Cells[row, col].Text))
+                                string clientActualSignature = uatWorkSheet.Cells[row, signatureColumnIndex].Text.Trim();
+                                string clientActualResponse = uatWorkSheet.Cells[row, actualResponseColumnIndex].Text.Trim();
+                                string endpoint = uatWorkSheet.Cells[row, endpointColumn].Text.Trim();
+                                string expectedResult = uatWorkSheet.Cells[row, expectedResultSheet].Text.Trim();
+
+                                // Check if the whole row is empty
+                                bool isRowEmpty = true;
+                                for (int col = 1; col <= uatWorkSheet.Dimension.Columns; col++)
                                 {
-                                    isRowEmpty = false;
-                                    break;
+                                    if (!string.IsNullOrWhiteSpace(uatWorkSheet.Cells[row, col].Text))
+                                    {
+                                        isRowEmpty = false;
+                                        break;
+
+                                    }
+                                }
+                                if (isRowEmpty) continue;
+
+                                //STEP 1: Check if scenario is skipped
+                                if (string.IsNullOrEmpty(clientActualSignature) && string.IsNullOrEmpty(clientActualResponse))
+                                {
+                                    uatWorkSheet.Cells[row, remarksColumnIndex].Value = "SKIPPED";
+                                    uatWorkSheet.Cells[row, commentColumnIndex].Value = "The scenario is skipped by the client";
+                                    continue;
+                                }
+
+                                // para ma gaya format ng json logs
+                                string formatActualResponse = clientActualResponse
+                                    .Replace("\n", "")
+                                    .Replace("\r", "")
+                                    .Replace("  ", "")
+                                    .Trim();
+
+                                formatActualResponse = Regex.Replace(formatActualResponse, @"\s*:\s*", ":");
+                                formatActualResponse = Regex.Replace(formatActualResponse, @"\s*,\s*", ",");
+                                string finalFormattedResponse = formatActualResponse.Replace("\"", "\\\"");
+
+                                //Console.WriteLine(expectedResult);
+                                string pattern = @"\{[\s\S]*\}"; // Matches everything inside the outermost curly braces
+                                Match match = Regex.Match(expectedResult, pattern);//testing
+                                string extractedJson = match.Value.Trim();
+                                Console.WriteLine(extractedJson);
+
+
+                                var expectedCodeRemarks = JsonConvert.DeserializeObject<dynamic>(extractedJson);
+                                var actualCodeRemarks = JsonConvert.DeserializeObject<dynamic>(clientActualResponse);
+
+
+                                string expectedResponseCode = expectedCodeRemarks.responseCode.ToString();
+                                string expectedRemarks = expectedCodeRemarks.remarks.ToString();
+                                string actualResponseCode = actualCodeRemarks.responseCode.ToString();
+                                string actualRemarks = actualCodeRemarks.remarks.ToString();
+
+                                Console.WriteLine($"Expected Response Code: \"{expectedResponseCode}\"");
+                                Console.WriteLine($"Expected Remarks: \"{expectedRemarks}\"");
+                                Console.WriteLine($"Actual Response Code: \"{actualResponseCode}\"");
+                                Console.WriteLine($"ActualRemarks: \"{actualRemarks}\"");
+
+                                Console.WriteLine($"Curent Sheet: \"{uatWorkSheet.Name}\"");
+                                Console.WriteLine($"Current Endpoint: \"{endpoint}\"");
+                                Console.WriteLine($"Column: \"{signatureColumnIndex}\" Row: \"{row}\"");
+                                Console.WriteLine($"Excel Signature: \"{clientActualSignature}\"");
+                                Console.WriteLine($"Excel Actual Response: \"{finalFormattedResponse}\"");
+
+                                if (endpoint.Contains("Get Biller") || endpoint.Contains("billerdata"))
+                                {
+                                    if (clientActualResponse.Contains(expectedRemarks) && clientActualResponse.Contains(expectedResponseCode))
+                                    {
+                                        uatWorkSheet.Cells[row, remarksColumnIndex].Value = "PASSED";
+                                    }
+                                    else
+                                    {
+                                        uatWorkSheet.Cells[row, remarksColumnIndex].Value = "FAILED";
+                                        uatWorkSheet.Cells[row, commentColumnIndex].Value = "Expected response code and remarks did not meet";
+                                    }
+                                }
+
+
+
+                                //STEP 2: check if expected api response code == actual api response code
+                                if (expectedResponseCode == actualResponseCode && expectedRemarks == actualRemarks)
+                                {
+                                    Console.WriteLine("STEP 2 PASSED!!!");
+                                    //continue;
+                                }
+                                else
+                                {
+                                    uatWorkSheet.Cells[row, remarksColumnIndex].Value = "FAILED";
+                                    uatWorkSheet.Cells[row, commentColumnIndex].Value = "Expected response code and remarks did not meet";
+                                    failedScenarios.Add($"Sheet: {uatWorkSheet.Name}, Row: {row}, Endpoint: {endpoint}, Error: Response Code or Remarks Mismatch");
+                                    Console.WriteLine("STEP 2 FAILED!!!");
+                                    //break;
+                                    continue;
+                                }
+
+                                JArray jsonObjects = JArray.Parse(jsonFileLog);
+                                bool matchFound = false;
+
+                                //Step 3: check if existing on logs
+                                foreach (JObject jsonObject in jsonObjects)
+                                {
+                                    string jsonLog = jsonObject.ToString();
+
+                                    if (finalFormattedResponse.Contains("\\\"data\\\":null}")) 
+                                    {
+                                        //Console.WriteLine("\"data\":null}");
+                                        if (jsonLog.Contains(clientActualSignature) && jsonLog.Contains(actualResponseCode) && jsonLog.Contains(actualRemarks))
+                                        {
+                                            matchFound = true;
+                                            string dateEntry = jsonObject["dateEntry"]["$date"].ToString();
+                                            DateTime parsedDate = DateTime.Parse(dateEntry, null, System.Globalization.DateTimeStyles.RoundtripKind);
+                                            string formattedDateEntry = parsedDate.ToString("yyyy-MM-ddTHH:mm:ss");
+                                            Console.WriteLine($"Match Found! Date Entry: {formattedDateEntry}");
+                                            Console.WriteLine("==================================================================================================================================");
+                                            //Console.WriteLine("Remarks: Passed");
+                                            uatWorkSheet.Cells[row, remarksColumnIndex].Value = "PASSED";
+                                            uatWorkSheet.Cells[row, commentColumnIndex].Value = "Scenario is verified, log date entry was: " + formattedDateEntry;
+                                            Console.WriteLine("STEP 3 PASSED!!!");
+                                            break;
+                                        }
+                                    }
+                                    else if (jsonLog.Contains(clientActualSignature) && jsonLog.Contains(finalFormattedResponse))
+                                    {
+                                        matchFound = true;
+                                        string dateEntry = jsonObject["dateEntry"]["$date"].ToString();
+                                        DateTime parsedDate = DateTime.Parse(dateEntry, null, System.Globalization.DateTimeStyles.RoundtripKind);
+                                        string formattedDateEntry = parsedDate.ToString("yyyy-MM-ddTHH:mm:ss");
+                                        Console.WriteLine($"Match Found! Date Entry: {formattedDateEntry}");
+                                        Console.WriteLine("==================================================================================================================================");
+                                        //Console.WriteLine("Remarks: Passed");
+                                        uatWorkSheet.Cells[row, remarksColumnIndex].Value = "PASSED";
+                                        uatWorkSheet.Cells[row, commentColumnIndex].Value = "Scenario is verified, log date entry was: " + formattedDateEntry;
+                                        Console.WriteLine("STEP 3 PASSED!!!");
+                                        break;
+                                    }
+
+                                }
+
+                                if (!matchFound)
+                                {
+                                    //Console.WriteLine("Remarks: Failed");
+                                    uatWorkSheet.Cells[row, remarksColumnIndex].Value = "FAILED";
+                                    uatWorkSheet.Cells[row, commentColumnIndex].Value = "Verification failed. No matching log entry.";
+                                    failedScenarios.Add($"Sheet: {uatWorkSheet.Name}, Row: {row}, Endpoint: {endpoint}, Error: No matching log entry found");
+                                    Console.WriteLine("STEP 3 FAILED!!!");
                                 }
                             }
-                            if (isRowEmpty) continue;
-
-                            // para ma gaya format ng json logs
-                            string formatActualResponse = clientActualResponse
-                                .Replace("\n", "")
-                                .Replace("\r", "")
-                                .Replace("  ", "")  
-                                .Trim();
-
-                            formatActualResponse = Regex.Replace(formatActualResponse, @"\s*:\s*", ":");
-                            formatActualResponse = Regex.Replace(formatActualResponse, @"\s*,\s*", ",");  
-                            string finalFormattedResponse = formatActualResponse.Replace("\"", "\\\"");
-
-                            
-                            //Console.WriteLine(expectedResult);
-                            var expectedCodeRemarks = JsonConvert.DeserializeObject<dynamic>(expectedResult);
-                            var actualCodeRemarks = JsonConvert.DeserializeObject<dynamic>(clientActualResponse);
-
-                            string expectedresponseCode = "200";
-                            string expectedRemarks = expectedCodeRemarks.remarks;
-                            string actualresponseCode = actualCodeRemarks.responseCode;
-                            string actualRemarks = actualCodeRemarks.remarks;
-
-                            Console.WriteLine($"Expected Response Code: \"{expectedresponseCode}\"");
-                            Console.WriteLine($"Expected Remarks: \"{expectedRemarks}\"");
-                            Console.WriteLine($"Actual Response Code: \"{actualresponseCode}\"");
-                            Console.WriteLine($"ActualRemarks: \"{actualRemarks}\"");
-
-                            Console.WriteLine($"Curent Sheet: \"{uatWorkSheet.Name}\"");
-                            Console.WriteLine($"Current Endpoint: \"{endpoint}\"");
-                            Console.WriteLine($"Column: \"{signatureColumnIndex}\" Row: \"{row}\"");
-                            Console.WriteLine($"Excel Signature: \"{clientActualSignature}\"");
-                            Console.WriteLine($"Excel Actual Response: \"{finalFormattedResponse}\"");
-
-
-                            //STEP 1: Check of scenario is skipped
-                            if (string.IsNullOrEmpty(clientActualSignature) && string.IsNullOrEmpty(clientActualResponse))
+                            catch (Exception ex)
                             {
-                                uatWorkSheet.Cells[row, remarksColumnIndex].Value = "SKIPPED";
-                                uatWorkSheet.Cells[row, commentColumnIndex].Value = "The scenario is skipped by the client";
+                                // Log error and continue
+                                Console.WriteLine($"Error processing sheet {uatWorkSheet}: {ex.Message}");
+                                Console.WriteLine($"Error processing row {row}: {ex.Message}");
+                                uatWorkSheet.Cells[row, remarksColumnIndex].Value = "FAILED";
+                                //uatWorkSheet.Cells[row, commentColumnIndex].Value = $"Error: {ex.Message}";
+                                failedScenarios.Add($"Sheet: {uatWorkSheet.Name}, Row: {row}, Error: {ex.Message}");
                                 continue;
                             }
 
-                            //STEP 2: check if expected api response code == actual api response code
-                            if (expectedresponseCode == actualresponseCode && expectedRemarks == actualRemarks)
-                            {
-                                Console.WriteLine("STEP 2 PASSED!!!");
-                                continue;
-                            }
-                            else
-                            {
-                                uatWorkSheet.Cells[row, remarksColumnIndex].Value = "FAILED";
-                                uatWorkSheet.Cells[row, commentColumnIndex].Value = "Expected response code and remarks did not meet";
-                                break;
-                            }
 
-                            JArray jsonObjects = JArray.Parse(jsonFileLog);
-                            bool matchFound = false;
 
-                            //Step 3: check if existing on logs
-                            foreach (JObject jsonObject in jsonObjects)
-                            {
-                                string jsonLog = jsonObject.ToString();
-
-                                if (jsonLog.Contains(clientActualSignature) && jsonLog.Contains(finalFormattedResponse))
-                                {
-
-                                    matchFound = true;
-                                    string dateEntry = jsonObject["dateEntry"]["$date"].ToString();
-                                    DateTime parsedDate = DateTime.Parse(dateEntry, null, System.Globalization.DateTimeStyles.RoundtripKind);
-                                    string formattedDateEntry = parsedDate.ToString("yyyy-MM-ddTHH:mm:ss");
-                                    Console.WriteLine($"Match Found! Date Entry: {formattedDateEntry}");
-                                    Console.WriteLine("==================================================================================================================================");
-                                    //Console.WriteLine("Remarks: Passed");
-                                    uatWorkSheet.Cells[row, remarksColumnIndex].Value = "PASSED";
-                                    uatWorkSheet.Cells[row, commentColumnIndex].Value = "Scenario is verified, log date entry was: " + formattedDateEntry;
-                                    break;
-
-                                }
-                                
-                            }
-
-                            if (!matchFound)
-                            {
-                                //Console.WriteLine("Remarks: Failed");
-                                uatWorkSheet.Cells[row, remarksColumnIndex].Value = "FAILED";
-                                uatWorkSheet.Cells[row, commentColumnIndex].Value = "Verification failed. No logs found containing the signature or actual response";
-                            }
-                            
                         }
 
                     }
@@ -225,6 +286,23 @@ namespace UAT_Automation_Script
                     newFilePath = newFileName; // Store the new file path for display
 
                 }
+
+                // Update UI with failed scenarios
+                Invoke(new Action(() =>
+                {
+                    failedScenariosListBox.Items.Clear();
+                    if (failedScenarios.Count > 0)
+                    {
+                        foreach (var item in failedScenarios)
+                        {
+                            failedScenariosListBox.Items.Add(item);
+                        }
+                    }
+                    else
+                    {
+                        failedScenariosListBox.Items.Add("No failures detected!");
+                    }
+                }));
                 return true;
             }
             catch (Exception ex)
