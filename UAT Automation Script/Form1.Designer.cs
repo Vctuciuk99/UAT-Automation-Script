@@ -44,6 +44,7 @@
             apiDropdown = new ComboBox();
             label4 = new Label();
             failedScenariosListBox = new ListBox();
+            api_errorMsgLabel = new Label();
             SuspendLayout();
             // 
             // label1
@@ -203,11 +204,22 @@
             failedScenariosListBox.Size = new Size(853, 340);
             failedScenariosListBox.TabIndex = 21;
             // 
+            // api_errorMsgLabel
+            // 
+            api_errorMsgLabel.AutoSize = true;
+            api_errorMsgLabel.Font = new Font("Segoe UI", 9F, FontStyle.Bold | FontStyle.Italic, GraphicsUnit.Point, 0);
+            api_errorMsgLabel.ForeColor = Color.Red;
+            api_errorMsgLabel.Location = new Point(169, 97);
+            api_errorMsgLabel.Name = "api_errorMsgLabel";
+            api_errorMsgLabel.Size = new Size(0, 20);
+            api_errorMsgLabel.TabIndex = 22;
+            // 
             // Form1
             // 
             AutoScaleDimensions = new SizeF(8F, 20F);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(877, 821);
+            Controls.Add(api_errorMsgLabel);
             Controls.Add(failedScenariosListBox);
             Controls.Add(label4);
             Controls.Add(apiDropdown);
@@ -249,5 +261,6 @@
         private ComboBox apiDropdown;
         private Label label4;
         private ListBox failedScenariosListBox;
+        private Label api_errorMsgLabel;
     }
 }
